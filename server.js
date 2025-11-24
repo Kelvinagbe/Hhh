@@ -17,33 +17,6 @@ app.use(express.static('public'));
 const activeConnections = new Map();
 
 /**
- * Request pairing code from WhatsApp
- */
-async function requestPairingCode(sock, phoneNumber) {
-    try {
-        console.log(`\n🔄 Requesting pairing code for ${phoneNumber}...\n`);
-
-        // Wait for socket to be ready
-        if (!sock.authState?.creds) {
-            throw new Error('Socket not ready');
-        }
-
-        const code = await sock.requestPairingCode(phoneNumber);
-
-        console.log('╔════════════════════════════╗');
-        console.log('║   🔐 PAIRING CODE         ║');
-        console.log('╠════════════════════════════╣');
-        console.log(`║      ${code.padEnd(20)} ║`);
-        console.log('╚════════════════════════════╝\n');
-
-        return code;
-    } catch (error) {
-        console.error('❌ Failed to request pairing code:', error.message);
-        throw error;
-    }
-}
-
-/**
  * Create ZIP file of session credentials
  */
 async function zipSessionFolder(sessionDir) {
@@ -91,11 +64,37 @@ async function sendCredsToUser(sock, phoneNumber, sessionDir) {
 /**
  * Setup connection handlers
  */
-function setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir) {
+function setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir, pairingCodeCallback) {
     let credsSent = false;
+    let pairingCodeRequested = false;
 
     conn.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+
+        // Request pairing code when connection is ready
+        if ((connection === 'connecting' || qr) && !pairingCodeRequested && !conn.authState.creds.registered) {
+            pairingCodeRequested = true;
+            try {
+                console.log(`\n🔄 Requesting pairing code for ${normalizedNumber}...\n`);
+                const code = await conn.requestPairingCode(normalizedNumber);
+                
+                console.log('╔════════════════════════════╗');
+                console.log('║   🔐 PAIRING CODE         ║');
+                console.log('╠════════════════════════════╣');
+                console.log(`║      ${code.padEnd(20)} ║`);
+                console.log('╚════════════════════════════╝\n');
+
+                // Notify via callback
+                if (pairingCodeCallback) {
+                    pairingCodeCallback(code);
+                }
+            } catch (error) {
+                console.error('❌ Failed to request pairing code:', error.message);
+                if (pairingCodeCallback) {
+                    pairingCodeCallback(null, error);
+                }
+            }
+        }
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -123,7 +122,7 @@ function setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir) 
                 credsSent = true;
                 setTimeout(async () => {
                     await sendCredsToUser(conn, normalizedNumber, sessionDir);
-                }, 2000); // Wait 2 seconds for connection to stabilize
+                }, 2000);
             }
         } else if (connection === 'connecting') {
             console.log(`🔄 [${normalizedNumber}] Connecting...`);
@@ -138,7 +137,6 @@ function setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir) 
  */
 app.post("/api/pair", async (req, res) => {
     let conn;
-    const startTime = Date.now();
     
     try {
         const { number } = req.body;
@@ -173,8 +171,6 @@ app.post("/api/pair", async (req, res) => {
             auth: state,
             version,
             browser: ["Chrome (Linux)", "", ""],
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 60000,
         });
 
         // Store connection
@@ -185,29 +181,38 @@ app.post("/api/pair", async (req, res) => {
             timestamp: Date.now()
         });
 
-        // Setup handlers BEFORE requesting pairing code
-        setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir);
+        // Setup handlers with callback to return pairing code
+        let pairingCodeResolve;
+        const pairingCodePromise = new Promise((resolve, reject) => {
+            pairingCodeResolve = resolve;
+            
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                reject(new Error('Pairing code request timeout'));
+            }, 30000);
+        });
 
-        // Wait for socket to be ready
-        console.log('⏳ Waiting for socket initialization...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir, (code, error) => {
+            if (error) {
+                pairingCodeResolve({ error: error.message });
+            } else {
+                pairingCodeResolve({ code });
+            }
+        });
 
-        // Verify socket is ready
-        if (!conn.authState?.creds) {
-            throw new Error('Socket authentication not initialized');
+        // Wait for pairing code
+        const result = await pairingCodePromise;
+
+        if (result.error) {
+            throw new Error(result.error);
         }
 
-        // Request pairing code
-        console.log('📱 Requesting pairing code...');
-        const pairingCode = await requestPairingCode(conn, normalizedNumber);
-
-        const responseTime = Date.now() - startTime;
-        console.log(`✅ Pairing code generated in ${responseTime}ms`);
+        console.log(`✅ Pairing code generated: ${result.code}`);
 
         // Return response
         res.json({ 
             success: true, 
-            pairingCode,
+            pairingCode: result.code,
             message: "Pairing code generated successfully. Enter it in WhatsApp within 60 seconds.",
             phoneNumber: normalizedNumber,
             expiresIn: 60,
@@ -215,7 +220,8 @@ app.post("/api/pair", async (req, res) => {
                 "Open WhatsApp on your phone",
                 "Go to Settings > Linked Devices",
                 "Tap 'Link a Device'",
-                `Enter code: ${pairingCode}`,
+                "Tap 'Link with phone number instead'",
+                `Enter code: ${result.code}`,
                 "Your credentials will be sent to your WhatsApp DM once connected"
             ]
         });
