@@ -1,355 +1,350 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Pairing Code Generator</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .whatsapp-icon {
-            font-size: 64px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            color: #333;
-            font-weight: 600;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-
-        input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .example {
-            font-size: 12px;
-            color: #999;
-            margin-top: 5px;
-        }
-
-        button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .result {
-            margin-top: 30px;
-            padding: 20px;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .result.success {
-            background: #d4edda;
-            border: 2px solid #c3e6cb;
-            display: block;
-        }
-
-        .result.error {
-            background: #f8d7da;
-            border: 2px solid #f5c6cb;
-            display: block;
-        }
-
-        .pairing-code {
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        .code-display {
-            font-size: 48px;
-            font-weight: bold;
-            color: #667eea;
-            letter-spacing: 10px;
-            font-family: 'Courier New', monospace;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            margin: 15px 0;
-        }
-
-        .instructions {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 15px;
-        }
-
-        .instructions h3 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-
-        .instructions ol {
-            padding-left: 20px;
-            color: #666;
-        }
-
-        .instructions li {
-            margin-bottom: 10px;
-            line-height: 1.6;
-        }
-
-        .timer {
-            text-align: center;
-            color: #dc3545;
-            font-weight: 600;
-            margin-top: 10px;
-            font-size: 14px;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            color: #dc3545;
-            font-weight: 600;
-            text-align: center;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Pairing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="whatsapp-icon">📱</div>
-            <h1>WhatsApp Pairing Code</h1>
-            <p>Link your WhatsApp without QR code</p>
-        </div>
-
-        <form id="pairingForm">
-            <div class="form-group">
-                <label for="phoneNumber">Phone Number</label>
-                <input 
-                    type="tel" 
-                    id="phoneNumber" 
-                    placeholder="2348109860102" 
-                    required
-                    pattern="[0-9]+"
-                >
-                <div class="example">Example: 2348109860102 (with country code, no spaces or +)</div>
-            </div>
-
-            <button type="submit" id="submitBtn">
-                🔐 Generate Pairing Code
-            </button>
-        </form>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="margin-top: 10px; color: #666;">Generating pairing code...</p>
-        </div>
-
-        <div class="result" id="result">
-            <div class="pairing-code">
-                <h2 style="color: #333; margin-bottom: 10px;">Your Pairing Code</h2>
-                <div class="code-display" id="codeDisplay">XXXX-XXXX</div>
-                <div class="timer" id="timer">⏰ Expires in 60 seconds</div>
-            </div>
-
-            <div class="instructions">
-                <h3>📝 How to Use:</h3>
-                <ol>
-                    <li>Open WhatsApp on your phone</li>
-                    <li>Go to <strong>Settings</strong> → <strong>Linked Devices</strong></li>
-                    <li>Tap <strong>Link a Device</strong></li>
-                    <li>Select <strong>Link with phone number</strong></li>
-                    <li>Enter the code shown above</li>
-                </ol>
-            </div>
-        </div>
-
-        <div class="result error" id="errorResult" style="display: none;">
-            <div class="error-message" id="errorMessage">
-                ❌ Failed to generate pairing code
-            </div>
-        </div>
+  <div class="min-h-screen bg-black p-8 relative overflow-hidden">
+    <div 
+      class="absolute inset-0 bg-center bg-no-repeat bg-cover opacity-100"
+      style="background-image: url('/james.png'); background-size: cover; background-position: center;">
     </div>
+    
+    <div class="max-w-2xl mx-auto relative z-10">
+      <div class="bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl shadow-2xl p-8">
+        <div class="text-center mb-8">
+          <h1 class="text-2xl font-bold text-white mb-1" style="letter-spacing: 0.1em;">
+            𝐎𝐕𝐑𝐈𝐂𝐀_𝐕𝟏 Whatsapp pair
+          </h1>
+        </div>
 
-    <script>
-        const form = document.getElementById('pairingForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const errorResult = document.getElementById('errorResult');
-        const codeDisplay = document.getElementById('codeDisplay');
-        const timerDisplay = document.getElementById('timer');
-        const errorMessage = document.getElementById('errorMessage');
+        <div class="relative z-10">
+          <div class="flex items-center gap-3 mb-6">
+            <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+              <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+            <h2 class="text-xl font-semibold text-white">Connect Your WhatsApp</h2>
+          </div>
 
-        let countdownInterval;
+          <div class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-400 mb-2">
+                Phone Number (with country code)
+              </label>
+              <input
+                type="text"
+                id="phoneNumber"
+                placeholder="e.g., 1234567890"
+                class="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-white placeholder-gray-500 transition"
+              />
+              <p class="text-xs text-gray-500 mt-1">Enter your WhatsApp number with country code (no + or spaces)</p>
+            </div>
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+            <button
+              id="connectBtn"
+              class="w-full bg-white hover:bg-gray-100 disabled:bg-zinc-800 disabled:text-gray-600 text-black font-medium py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+            >
+              Connect WhatsApp
+            </button>
 
-            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+            <div id="statusBox" class="hidden"></div>
 
-            // Validate phone number
-            if (!/^[0-9]{10,15}$/.test(phoneNumber)) {
-                showError('Invalid phone number format. Please include country code without + or spaces.');
-                return;
-            }
+            <div id="pairingCodeBox" class="hidden border border-zinc-800 rounded-lg p-6 bg-zinc-950">
+              <h3 class="text-lg font-semibold text-white mb-4 text-center">
+                Your Pairing Code
+              </h3>
+              <div class="bg-black border border-zinc-800 rounded-lg p-6 mb-4">
+                <div class="text-center">
+                  <p id="pairingCodeText" class="text-5xl font-mono font-bold text-emerald-500 tracking-widest mb-2"></p>
+                  <button
+                    id="copyCodeBtn"
+                    class="mt-4 flex items-center gap-2 px-6 py-2 bg-white hover:bg-gray-100 text-black rounded-lg transition mx-auto font-medium"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy Code
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2 text-sm text-gray-400">
+                <p class="font-semibold text-gray-300">How to use:</p>
+                <ol class="list-decimal list-inside space-y-1 ml-2">
+                  <li>Open WhatsApp on your phone</li>
+                  <li>Go to Settings → Linked Devices</li>
+                  <li>Tap Link a Device</li>
+                  <li>Tap Link with phone number instead</li>
+                  <li>Enter the code above</li>
+                </ol>
+              </div>
+            </div>
 
-            // Show loading
-            submitBtn.disabled = true;
-            loading.style.display = 'block';
-            result.style.display = 'none';
-            errorResult.style.display = 'none';
+            <div id="credsBox" class="hidden space-y-4">
+              <div class="border border-zinc-800 rounded-lg p-6 bg-zinc-950">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-lg font-semibold text-white">
+                    Session Connected!
+                  </h3>
+                  <button
+                    id="downloadBtn"
+                    class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition font-medium"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Download Creds
+                  </button>
+                </div>
+                <div class="bg-black p-4 rounded border border-zinc-800">
+                  <p class="text-gray-300 text-sm mb-2">✅ WhatsApp connected successfully!</p>
+                  <p class="text-gray-400 text-xs">Your credentials have been sent to your WhatsApp DM.</p>
+                  <p class="text-gray-400 text-xs mt-1">Click the button above to download a backup ZIP file.</p>
+                </div>
+              </div>
 
-            try {
-                const response = await fetch('/api/pair', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ number: phoneNumber })
-                });
+              <button
+                id="disconnectBtn"
+                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-900 hover:bg-red-800 text-white rounded-lg transition font-medium"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Disconnect Session
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                const data = await response.json();
+      <div class="mt-6 text-center text-sm text-gray-500">
+        <p>Save your credentials securely. Keep your session safe.</p>
+      </div>
 
-                if (data.success) {
-                    showPairingCode(data.pairingCode);
-                } else {
-                    showError(data.error || 'Failed to generate pairing code');
-                }
-            } catch (error) {
-                showError('Network error. Please try again.');
-            } finally {
-                loading.style.display = 'none';
-                submitBtn.disabled = false;
-            }
+      <div class="mt-4 text-center">
+        <p class="text-gray-500 text-sm">
+          Powered by <span class="text-white font-semibold" style="letter-spacing: 0.1em;">𝐊𝐄𝐋𝐕𝐈𝐍</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPhoneNumber = null;
+    let pollingInterval = null;
+
+    const phoneNumberInput = document.getElementById('phoneNumber');
+    const connectBtn = document.getElementById('connectBtn');
+    const statusBox = document.getElementById('statusBox');
+    const pairingCodeBox = document.getElementById('pairingCodeBox');
+    const pairingCodeText = document.getElementById('pairingCodeText');
+    const copyCodeBtn = document.getElementById('copyCodeBtn');
+    const credsBox = document.getElementById('credsBox');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+
+    function setStatus(message, type = 'info') {
+      statusBox.className = 'flex items-center gap-2 p-4 rounded-lg border ';
+      
+      if (type === 'success') {
+        statusBox.className += 'bg-emerald-950 border-emerald-800 text-emerald-400';
+        statusBox.innerHTML = `
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="font-medium">${message}</span>
+        `;
+      } else if (type === 'error') {
+        statusBox.className += 'bg-red-950 border-red-800 text-red-400';
+        statusBox.innerHTML = `
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span class="font-medium">${message}</span>
+        `;
+      } else {
+        statusBox.className += 'bg-blue-950 border-blue-800 text-blue-400';
+        statusBox.innerHTML = `<span class="font-medium">${message}</span>`;
+      }
+      
+      statusBox.classList.remove('hidden');
+    }
+
+    function setLoading(loading) {
+      if (loading) {
+        connectBtn.disabled = true;
+        connectBtn.innerHTML = `
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
+          Connecting...
+        `;
+        phoneNumberInput.disabled = true;
+      } else {
+        connectBtn.disabled = false;
+        connectBtn.innerHTML = 'Connect WhatsApp';
+        phoneNumberInput.disabled = false;
+      }
+    }
+
+    async function handleConnect() {
+      const phoneNumber = phoneNumberInput.value.trim();
+      
+      if (!phoneNumber) {
+        setStatus('Please enter a phone number', 'error');
+        return;
+      }
+
+      currentPhoneNumber = phoneNumber;
+      setLoading(true);
+      setStatus('Generating pairing code...', 'info');
+      pairingCodeBox.classList.add('hidden');
+      credsBox.classList.add('hidden');
+
+      try {
+        const response = await fetch('/api/pair', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ number: phoneNumber })
         });
 
-        function showPairingCode(code) {
-            // Format code with dash in middle (XXXX-XXXX)
-            const formattedCode = code.match(/.{1,4}/g).join('-');
-            codeDisplay.textContent = formattedCode;
-            result.style.display = 'block';
+        const data = await response.json();
 
-            // Start countdown
-            startCountdown(60);
+        if (data.success && data.pairingCode) {
+          pairingCodeText.textContent = data.pairingCode;
+          pairingCodeBox.classList.remove('hidden');
+          setStatus('Enter the pairing code in WhatsApp (valid for 60 seconds)', 'info');
+          startStatusPolling(phoneNumber);
+        } else {
+          setStatus(data.error || 'Failed to generate pairing code', 'error');
+          setLoading(false);
         }
+      } catch (error) {
+        setStatus('Connection error: ' + error.message, 'error');
+        setLoading(false);
+        console.error('Connect error:', error);
+      }
+    }
 
-        function showError(message) {
-            errorMessage.textContent = '❌ ' + message;
-            errorResult.style.display = 'block';
+    function startStatusPolling(phoneNumber) {
+      if (pollingInterval) clearInterval(pollingInterval);
+
+      pollingInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/status/${phoneNumber}`);
+          const data = await response.json();
+
+          if (data.connected && data.state === 'open') {
+            clearInterval(pollingInterval);
+            setStatus('✓ Connected! Credentials sent to your WhatsApp DM', 'success');
+            pairingCodeBox.classList.add('hidden');
+            credsBox.classList.remove('hidden');
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Polling error:', error.message);
         }
+      }, 2000);
 
-        function startCountdown(seconds) {
-            let remaining = seconds;
-
-            // Clear any existing countdown
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
-
-            countdownInterval = setInterval(() => {
-                remaining--;
-                timerDisplay.textContent = `⏰ Expires in ${remaining} seconds`;
-
-                if (remaining <= 0) {
-                    clearInterval(countdownInterval);
-                    timerDisplay.textContent = '⏱️ Code has expired';
-                    timerDisplay.style.color = '#dc3545';
-                }
-            }, 1000);
+      // Stop polling after 90 seconds
+      setTimeout(() => {
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setStatus('Pairing timeout - please try again', 'error');
+          setLoading(false);
         }
-    </script>
+      }, 90000);
+    }
+
+    function copyToClipboard(text, button) {
+      navigator.clipboard.writeText(text);
+      const originalHTML = button.innerHTML;
+      button.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        Copied!
+      `;
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+      }, 2000);
+    }
+
+    async function handleDownload() {
+      if (!currentPhoneNumber) return;
+      
+      try {
+        const response = await fetch(`/api/download-creds/${currentPhoneNumber}`);
+        if (!response.ok) throw new Error('Download failed');
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `creds_${currentPhoneNumber}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        setStatus('Credentials downloaded successfully', 'success');
+      } catch (error) {
+        setStatus('Download failed: ' + error.message, 'error');
+      }
+    }
+
+    async function handleDisconnect() {
+      if (!currentPhoneNumber) return;
+      
+      if (!confirm('Are you sure you want to disconnect this session?')) return;
+      
+      try {
+        const response = await fetch(`/api/disconnect/${currentPhoneNumber}`, {
+          method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setStatus('Session disconnected successfully', 'success');
+          credsBox.classList.add('hidden');
+          pairingCodeBox.classList.add('hidden');
+          phoneNumberInput.value = '';
+          currentPhoneNumber = null;
+        } else {
+          setStatus(data.message || 'Disconnect completed', 'info');
+        }
+      } catch (error) {
+        setStatus('Disconnect error: ' + error.message, 'error');
+      }
+    }
+
+    connectBtn.addEventListener('click', handleConnect);
+    copyCodeBtn.addEventListener('click', () => {
+      copyToClipboard(pairingCodeText.textContent, copyCodeBtn);
+    });
+    downloadBtn.addEventListener('click', handleDownload);
+    disconnectBtn.addEventListener('click', handleDisconnect);
+
+    phoneNumberInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        handleConnect();
+      }
+    });
+  </script>
 </body>
 </html>
