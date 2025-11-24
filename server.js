@@ -4,6 +4,7 @@ const { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBailey
 const P = require('pino');
 const path = require('path');
 const fs = require('fs');
+const archiver = require('archiver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,7 +15,6 @@ app.use(express.static('public'));
 
 // Store active connections
 const activeConnections = new Map();
-const pairingCodes = new Map();
 
 /**
  * Request pairing code from WhatsApp
@@ -22,15 +22,20 @@ const pairingCodes = new Map();
 async function requestPairingCode(sock, phoneNumber) {
     try {
         console.log(`\n🔄 Requesting pairing code for ${phoneNumber}...\n`);
-        
+
+        // Wait for socket to be ready
+        if (!sock.authState?.creds) {
+            throw new Error('Socket not ready');
+        }
+
         const code = await sock.requestPairingCode(phoneNumber);
-        
+
         console.log('╔════════════════════════════╗');
         console.log('║   🔐 PAIRING CODE         ║');
         console.log('╠════════════════════════════╣');
         console.log(`║      ${code.padEnd(20)} ║`);
         console.log('╚════════════════════════════╝\n');
-        
+
         return code;
     } catch (error) {
         console.error('❌ Failed to request pairing code:', error.message);
@@ -39,25 +44,71 @@ async function requestPairingCode(sock, phoneNumber) {
 }
 
 /**
+ * Create ZIP file of session credentials
+ */
+async function zipSessionFolder(sessionDir) {
+    return new Promise((resolve, reject) => {
+        const outputPath = `${sessionDir}.zip`;
+        const output = fs.createWriteStream(outputPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', () => resolve(outputPath));
+        archive.on('error', reject);
+
+        archive.pipe(output);
+        archive.directory(sessionDir, false);
+        archive.finalize();
+    });
+}
+
+/**
+ * Send credentials file to user's DM
+ */
+async function sendCredsToUser(sock, phoneNumber, sessionDir) {
+    try {
+        const zipPath = await zipSessionFolder(sessionDir);
+        const userJid = `${phoneNumber}@s.whatsapp.net`;
+
+        // Send message with creds file
+        await sock.sendMessage(userJid, {
+            document: fs.readFileSync(zipPath),
+            fileName: `creds_${phoneNumber}.zip`,
+            mimetype: 'application/zip',
+            caption: `✅ *WhatsApp Session Connected!*\n\n📁 Your credentials file (creds.json and session files)\n🔐 Keep this file safe and private\n⚠️ Do not share with anyone\n\n*Important Notes:*\n- This file contains your session data\n- You can use it to restore your connection\n- Store it securely\n\n✨ Connection successful!`
+        });
+
+        // Clean up zip file
+        fs.unlinkSync(zipPath);
+
+        console.log(`✅ Credentials sent to ${phoneNumber}`);
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to send credentials:', error.message);
+        return false;
+    }
+}
+
+/**
  * Setup connection handlers
  */
-function setupConnectionHandlers(conn, normalizedNumber, saveCreds) {
+function setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir) {
+    let credsSent = false;
+
     conn.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
-        
+
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const errorMsg = lastDisconnect?.error?.message || 'Unknown error';
-            
+
             console.log(`\n🔌 [${normalizedNumber}] Disconnected: ${errorMsg}`);
             console.log(`📊 Status Code: ${statusCode}\n`);
-            
+
             // Clean up on certain disconnect reasons
             if (statusCode === DisconnectReason.loggedOut || 
                 statusCode === DisconnectReason.forbidden ||
                 statusCode === DisconnectReason.connectionReplaced) {
-                
-                const sessionDir = path.join(__dirname, "sessions", normalizedNumber);
+
                 if (fs.existsSync(sessionDir)) {
                     fs.rmSync(sessionDir, { recursive: true, force: true });
                     console.log(`🗑️ Deleted session for: ${normalizedNumber}`);
@@ -66,11 +117,19 @@ function setupConnectionHandlers(conn, normalizedNumber, saveCreds) {
             }
         } else if (connection === 'open') {
             console.log(`\n✅ [${normalizedNumber}] Connected to WhatsApp!\n`);
+            
+            // Send creds file to user's DM (only once)
+            if (!credsSent) {
+                credsSent = true;
+                setTimeout(async () => {
+                    await sendCredsToUser(conn, normalizedNumber, sessionDir);
+                }, 2000); // Wait 2 seconds for connection to stabilize
+            }
         } else if (connection === 'connecting') {
             console.log(`🔄 [${normalizedNumber}] Connecting...`);
         }
     });
-    
+
     conn.ev.on('creds.update', saveCreds);
 }
 
@@ -79,15 +138,17 @@ function setupConnectionHandlers(conn, normalizedNumber, saveCreds) {
  */
 app.post("/api/pair", async (req, res) => {
     let conn;
+    const startTime = Date.now();
+    
     try {
         const { number } = req.body;
-        
+
         if (!number) {
             return res.status(400).json({ error: "Phone number is required" });
         }
 
         const normalizedNumber = number.replace(/\D/g, "");
-        
+
         if (normalizedNumber.length < 10) {
             return res.status(400).json({ 
                 error: "Invalid phone number format. Include country code (e.g., 2348109860102)" 
@@ -105,7 +166,7 @@ app.post("/api/pair", async (req, res) => {
         // Initialize WhatsApp connection
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version } = await fetchLatestBaileysVersion();
-        
+
         conn = makeWASocket({
             logger: P({ level: "silent" }),
             printQRInTerminal: false,
@@ -113,55 +174,80 @@ app.post("/api/pair", async (req, res) => {
             version,
             browser: ["Chrome (Linux)", "", ""],
             connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 60000,
         });
 
         // Store connection
-        activeConnections.set(normalizedNumber, { conn, saveCreds });
+        activeConnections.set(normalizedNumber, { 
+            conn, 
+            saveCreds, 
+            sessionDir,
+            timestamp: Date.now()
+        });
 
-        // Setup handlers
-        setupConnectionHandlers(conn, normalizedNumber, saveCreds);
+        // Setup handlers BEFORE requesting pairing code
+        setupConnectionHandlers(conn, normalizedNumber, saveCreds, sessionDir);
 
-        // Wait for connection to initialize
+        // Wait for socket to be ready
+        console.log('⏳ Waiting for socket initialization...');
         await new Promise(resolve => setTimeout(resolve, 3000));
 
+        // Verify socket is ready
+        if (!conn.authState?.creds) {
+            throw new Error('Socket authentication not initialized');
+        }
+
         // Request pairing code
+        console.log('📱 Requesting pairing code...');
         const pairingCode = await requestPairingCode(conn, normalizedNumber);
-        
-        // Store pairing code with timestamp
-        pairingCodes.set(normalizedNumber, { 
-            code: pairingCode, 
-            timestamp: Date.now() 
-        });
+
+        const responseTime = Date.now() - startTime;
+        console.log(`✅ Pairing code generated in ${responseTime}ms`);
 
         // Return response
         res.json({ 
             success: true, 
             pairingCode,
-            message: "Pairing code generated successfully. Valid for 60 seconds.",
-            expiresIn: 60
+            message: "Pairing code generated successfully. Enter it in WhatsApp within 60 seconds.",
+            phoneNumber: normalizedNumber,
+            expiresIn: 60,
+            instructions: [
+                "Open WhatsApp on your phone",
+                "Go to Settings > Linked Devices",
+                "Tap 'Link a Device'",
+                `Enter code: ${pairingCode}`,
+                "Your credentials will be sent to your WhatsApp DM once connected"
+            ]
         });
 
     } catch (error) {
-        console.error("Error generating pairing code:", error);
-        
+        console.error("❌ Error generating pairing code:", error);
+
         // Clean up on failure
-        if (conn && number) {
+        if (conn) {
             try {
-                const normalizedNumber = number.replace(/\D/g, "");
-                const sessionDir = path.join(__dirname, "sessions", normalizedNumber);
-                
-                if (fs.existsSync(sessionDir)) {
-                    fs.rmSync(sessionDir, { recursive: true, force: true });
+                const normalizedNumber = req.body.number?.replace(/\D/g, "");
+                if (normalizedNumber) {
+                    const sessionDir = path.join(__dirname, "sessions", normalizedNumber);
+
+                    if (fs.existsSync(sessionDir)) {
+                        fs.rmSync(sessionDir, { recursive: true, force: true });
+                    }
+
+                    if (conn.ws) {
+                        conn.ws.close();
+                    }
+                    activeConnections.delete(normalizedNumber);
                 }
-                
-                conn.ws.close();
-                activeConnections.delete(normalizedNumber);
-            } catch (e) {}
+            } catch (cleanupError) {
+                console.error('Cleanup error:', cleanupError.message);
+            }
         }
-        
+
         res.status(500).json({ 
             error: "Failed to generate pairing code",
-            details: error.message 
+            details: error.message,
+            suggestion: "Please try again with a valid phone number including country code"
         });
     }
 });
@@ -172,15 +258,45 @@ app.post("/api/pair", async (req, res) => {
 app.get("/api/status/:number", (req, res) => {
     const normalizedNumber = req.params.number.replace(/\D/g, "");
     const connection = activeConnections.get(normalizedNumber);
-    
+
     if (!connection) {
-        return res.json({ connected: false });
+        return res.json({ 
+            connected: false,
+            message: "No active connection found"
+        });
     }
+
+    const isOpen = connection.conn.ws?.readyState === 1;
     
     res.json({ 
-        connected: true,
-        state: connection.conn.ws.readyState === 1 ? 'open' : 'closed'
+        connected: isOpen,
+        state: isOpen ? 'open' : 'closed',
+        timestamp: connection.timestamp,
+        uptime: Date.now() - connection.timestamp
     });
+});
+
+/**
+ * API Endpoint: Download credentials
+ */
+app.get("/api/download-creds/:number", async (req, res) => {
+    const normalizedNumber = req.params.number.replace(/\D/g, "");
+    const connection = activeConnections.get(normalizedNumber);
+
+    if (!connection) {
+        return res.status(404).json({ error: "Session not found" });
+    }
+
+    try {
+        const zipPath = await zipSessionFolder(connection.sessionDir);
+        res.download(zipPath, `creds_${normalizedNumber}.zip`, (err) => {
+            if (!err) {
+                fs.unlinkSync(zipPath);
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 /**
@@ -189,22 +305,24 @@ app.get("/api/status/:number", (req, res) => {
 app.delete("/api/disconnect/:number", async (req, res) => {
     const normalizedNumber = req.params.number.replace(/\D/g, "");
     const connection = activeConnections.get(normalizedNumber);
-    
+
     if (!connection) {
         return res.json({ message: "No active connection found" });
     }
-    
+
     try {
         await connection.conn.logout();
-        connection.conn.ws.close();
+        connection.conn.ws?.close();
         activeConnections.delete(normalizedNumber);
-        
-        const sessionDir = path.join(__dirname, "sessions", normalizedNumber);
-        if (fs.existsSync(sessionDir)) {
-            fs.rmSync(sessionDir, { recursive: true, force: true });
+
+        if (fs.existsSync(connection.sessionDir)) {
+            fs.rmSync(connection.sessionDir, { recursive: true, force: true });
         }
-        
-        res.json({ message: "Disconnected successfully" });
+
+        res.json({ 
+            success: true,
+            message: "Disconnected successfully" 
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -215,11 +333,22 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Cleanup on server shutdown
+process.on('SIGINT', () => {
+    console.log('\n🛑 Shutting down server...');
+    activeConnections.forEach((connection, number) => {
+        try {
+            connection.conn.ws?.close();
+        } catch (e) {}
+    });
+    process.exit(0);
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🚀 WhatsApp Pairing Code Server');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-    console.log(`📡 Server running on: http://localhost:${PORT}`);
+    console.log(`📡 Server: http://localhost:${PORT}`);
     console.log(`🌐 Ready to generate pairing codes!\n`);
 });
