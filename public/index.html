@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Pairing Code Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .whatsapp-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .example {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            display: block;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            display: block;
+        }
+
+        .pairing-code {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .code-display {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 10px;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .instructions {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .instructions ol {
+            padding-left: 20px;
+            color: #666;
+        }
+
+        .instructions li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .timer {
+            text-align: center;
+            color: #dc3545;
+            font-weight: 600;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-weight: 600;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="whatsapp-icon">📱</div>
+            <h1>WhatsApp Pairing Code</h1>
+            <p>Link your WhatsApp without QR code</p>
+        </div>
+
+        <form id="pairingForm">
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number</label>
+                <input 
+                    type="tel" 
+                    id="phoneNumber" 
+                    placeholder="2348109860102" 
+                    required
+                    pattern="[0-9]+"
+                >
+                <div class="example">Example: 2348109860102 (with country code, no spaces or +)</div>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                🔐 Generate Pairing Code
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: #666;">Generating pairing code...</p>
+        </div>
+
+        <div class="result" id="result">
+            <div class="pairing-code">
+                <h2 style="color: #333; margin-bottom: 10px;">Your Pairing Code</h2>
+                <div class="code-display" id="codeDisplay">XXXX-XXXX</div>
+                <div class="timer" id="timer">⏰ Expires in 60 seconds</div>
+            </div>
+
+            <div class="instructions">
+                <h3>📝 How to Use:</h3>
+                <ol>
+                    <li>Open WhatsApp on your phone</li>
+                    <li>Go to <strong>Settings</strong> → <strong>Linked Devices</strong></li>
+                    <li>Tap <strong>Link a Device</strong></li>
+                    <li>Select <strong>Link with phone number</strong></li>
+                    <li>Enter the code shown above</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="result error" id="errorResult" style="display: none;">
+            <div class="error-message" id="errorMessage">
+                ❌ Failed to generate pairing code
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('pairingForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const errorResult = document.getElementById('errorResult');
+        const codeDisplay = document.getElementById('codeDisplay');
+        const timerDisplay = document.getElementById('timer');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let countdownInterval;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const phoneNumber = document.getElementById('phoneNumber').value.trim();
+
+            // Validate phone number
+            if (!/^[0-9]{10,15}$/.test(phoneNumber)) {
+                showError('Invalid phone number format. Please include country code without + or spaces.');
+                return;
+            }
+
+            // Show loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            errorResult.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/pair', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ number: phoneNumber })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showPairingCode(data.pairingCode);
+                } else {
+                    showError(data.error || 'Failed to generate pairing code');
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            } finally {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        function showPairingCode(code) {
+            // Format code with dash in middle (XXXX-XXXX)
+            const formattedCode = code.match(/.{1,4}/g).join('-');
+            codeDisplay.textContent = formattedCode;
+            result.style.display = 'block';
+
+            // Start countdown
+            startCountdown(60);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = '❌ ' + message;
+            errorResult.style.display = 'block';
+        }
+
+        function startCountdown(seconds) {
+            let remaining = seconds;
+
+            // Clear any existing countdown
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+
+            countdownInterval = setInterval(() => {
+                remaining--;
+                timerDisplay.textContent = `⏰ Expires in ${remaining} seconds`;
+
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    timerDisplay.textContent = '⏱️ Code has expired';
+                    timerDisplay.style.color = '#dc3545';
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
